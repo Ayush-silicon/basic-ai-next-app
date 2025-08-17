@@ -42,7 +42,49 @@ export default function Home() {
       setLoading(false);
     }
   };
+  const handleStreamChat = async () => {
+    setStreaming(true);
+    setStreamResponse("");
 
+    try {
+      const res = await fetch("/api/chat-stream", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ messages: message }),
+      })
+
+      const reader = res.body.getReader()
+      const decoder = new TextDecoder()
+      while(true){
+         const { done, value } = await reader.read()
+          if (done) break;
+
+          const chunk = decoder.decode(value)
+          const lines = chunk.split("\n")
+          for (const line of lines) {
+            if (line.startsWith ("data: ")) {
+              const data = JSON.parse(line.slice(6))
+              if (data.content) {
+                setStreamResponse((prev) => prev + data.content)
+              } else if (data.error) {
+                console.error("Stream error:", data.error)
+                setStreamResponse("An error occurred while streaming response.")
+                setStreaming(false)
+                return;
+              }
+              
+            }
+          }
+        }
+      } catch (error) {
+        console.error("Stream error:", error);
+        setStreamResponse("An error occurred while streaming response.");
+
+      }
+    }
+     
   return (
     <div className={styles.page}>
       <div className="grid-overlay" />
@@ -69,6 +111,13 @@ export default function Home() {
             >
               {loading ? "Loading..." : "Chat"}
             </button>
+            <button
+              className="btn-3d"
+              onClick={handleStreamChat}
+              disabled={streaming}
+            >
+              {streaming ? "Streaming..." : "Stream Chat"}
+            </button>   
           </div>
 
           {response && (
